@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
 import {
   StyleSheet,
   Text,
@@ -12,7 +14,20 @@ import * as FileSystem from "expo-file-system";
 
 const fileUri = FileSystem.documentDirectory + "quotes.txt";
 
+const Stack = createStackNavigator();
+
 export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Details" component={DetailsScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+const HomeScreen = ({ navigation }) => {
   const [quote, setQuote] = useState("");
   const [quotes, setQuotes] = useState([]);
 
@@ -83,14 +98,42 @@ export default function App() {
           keyExtractor={(item, index) => index.toString()}
           renderItem={({ item }) => (
             <View style={styles.quoteContainer}>
-              <Text style={styles.quoteText}>"{item}"</Text>
+              <Text style={styles.quoteText}>
+                {item.length > 25 ? item.substring(0, 25) + "..." : item}
+              </Text>
+              <Button
+                title="View Details"
+                onPress={() => navigation.navigate("Details", { quote: item })}
+              />
             </View>
           )}
         />
       )}
     </View>
   );
-}
+};
+
+const DetailsScreen = ({ route, navigation }) => {
+  const [quote, setQuote] = useState(route.params?.quote);
+
+  return (
+    <View style={styles.container}>
+      <TextInput
+        style={styles.input}
+        multiline
+        value={quote}
+        onChangeText={(text) => setQuote(text)}
+      />
+      <Button
+        title="Save"
+        onPress={() => {
+          Alert.alert("Quote saved!", "Your changes have been saved.");
+          navigation.navigate("Home", { updatedQuote: quote }); // Fix here
+        }}
+      />
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
