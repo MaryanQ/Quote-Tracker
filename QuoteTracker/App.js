@@ -7,18 +7,23 @@ import {
   View,
   FlatList,
   Alert,
+  Platform,
 } from "react-native";
 import * as FileSystem from "expo-file-system";
 
-const fileUri = FileSystem.documentDirectory + "quotes.txt";
+const fileUri = "quotes.txt"; // Dummy fileUri for native platforms
 
 export default function App() {
   const [quote, setQuote] = useState("");
   const [quotes, setQuotes] = useState([]);
 
-  // Load quotes from the file when the app starts
+  // Load quotes from the file or localStorage when the app starts
   useEffect(() => {
-    loadQuotesFromFile();
+    if (Platform.OS === "web") {
+      loadQuotesFromLocalStorage();
+    } else {
+      loadQuotesFromFile();
+    }
   }, []);
 
   // Function to add a new quote
@@ -27,13 +32,39 @@ export default function App() {
       const newQuotes = [...quotes, quote.trim()];
       setQuotes(newQuotes);
       setQuote(""); // Clear input field
-      saveQuotesToFile(newQuotes); // Save quotes to local file
+      if (Platform.OS === "web") {
+        saveQuotesToLocalStorage(newQuotes);
+      } else {
+        saveQuotesToFile(newQuotes);
+      }
     } else {
       Alert.alert("Input Error", "Please enter a valid quote.");
     }
   };
 
-  // Function to save quotes to a file
+  // Function to save quotes to localStorage (Web)
+  const saveQuotesToLocalStorage = (quotesToSave) => {
+    try {
+      localStorage.setItem("quotes", JSON.stringify(quotesToSave));
+      Alert.alert("Success", "Quote saved successfully!");
+    } catch (error) {
+      Alert.alert("Save Error", "Failed to save quotes.");
+      console.log("Save error:", error);
+    }
+  };
+
+  // Function to load quotes from localStorage (Web)
+  const loadQuotesFromLocalStorage = () => {
+    try {
+      const savedQuotes = JSON.parse(localStorage.getItem("quotes")) || [];
+      setQuotes(savedQuotes);
+      console.log("Quotes loaded from localStorage:", savedQuotes);
+    } catch (error) {
+      console.log("No quotes found in localStorage, initializing empty list.");
+    }
+  };
+
+  // Function to save quotes to a file (Native platforms)
   const saveQuotesToFile = async (quotesToSave) => {
     try {
       await FileSystem.writeAsStringAsync(
@@ -41,19 +72,21 @@ export default function App() {
         JSON.stringify(quotesToSave)
       );
       Alert.alert("Success", "Quote saved successfully!");
+      console.log("Quotes saved to file:", quotesToSave);
     } catch (error) {
       Alert.alert("Save Error", "Failed to save quotes.");
+      console.log("Save error:", error);
     }
   };
 
-  // Function to load quotes from the file
+  // Function to load quotes from the file (Native platforms)
   const loadQuotesFromFile = async () => {
     try {
       const fileContent = await FileSystem.readAsStringAsync(fileUri);
       const loadedQuotes = JSON.parse(fileContent) || [];
       setQuotes(loadedQuotes);
+      console.log("Quotes loaded from file:", loadedQuotes);
     } catch (error) {
-      // If the file doesn't exist, ignore the error and initialize with an empty list
       console.log("No quotes file found, initializing empty list.");
     }
   };
