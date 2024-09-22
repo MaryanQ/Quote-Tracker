@@ -1,4 +1,13 @@
 import React, { useState, useEffect } from "react";
+import { database } from "./firebase";
+import {
+  collection,
+  addDoc,
+  deleteDoc,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
+import { useCollection } from "react-firebase-hooks/firestore";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import {
@@ -29,22 +38,38 @@ export default function App() {
 
 const HomeScreen = ({ navigation }) => {
   const [quote, setQuote] = useState("");
-  const [quotes, setQuotes] = useState([]);
+  const [quotes, loading, error] = useCollection(
+    collection(database, "quotes")
+  );
 
+  const data = quotes?.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
   // Load quotes from the file when the app starts
   useEffect(() => {
     loadQuotesFromFile();
   }, []);
 
   // Function to add a new quote
-  const addQuote = () => {
+  const addQuote = async () => {
     if (quote.trim()) {
-      const newQuotes = [...quotes, quote.trim()];
-      setQuotes(newQuotes);
-      setQuote(""); // Clear input field
-      saveQuotesToFile(newQuotes); // Save quotes to local file
+      try {
+        await addDoc(collection(database, "quotes"), {
+          quote: quote, // Field should be 'quote' to match what you're using in Firestore
+        });
+        setQuote(""); // Clear input field
+      } catch (error) {
+        console.error("Error adding document: ", error);
+      }
     } else {
-      Alert.alert("Input Error", "Please enter a valid quote.");
+      Alert.alert("Error", "Please enter a quote.");
+    }
+  };
+
+  const deleteQuote = async (id) => {
+    try {
+      await deleteDoc(doc(database, "quotes", id));
+      Alert.alert("Success", "Quote deleted!");
+    } catch (error) {
+      console.error("Error deleting document: ", error);
     }
   };
 
@@ -77,7 +102,6 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       <Text style={styles.header}>Quote App</Text>
 
-      {/* Text input for entering a new quote */}
       <TextInput
         style={styles.input}
         placeholder="Enter a new quote"
@@ -85,25 +109,32 @@ const HomeScreen = ({ navigation }) => {
         onChangeText={(text) => setQuote(text)}
       />
 
-      {/* Button to add the new quote */}
       <Button title="Add Quote" onPress={addQuote} color="#1E90FF" />
 
-      {/* Show message if no quotes */}
-      {quotes.length === 0 ? (
+      {loading ? (
+        <Text>Loading quotes...</Text>
+      ) : data?.length === 0 ? (
         <Text style={styles.noQuotesText}>No quotes yet, add one!</Text>
       ) : (
         <FlatList
           style={styles.list}
-          data={quotes}
-          keyExtractor={(item, index) => index.toString()}
+          data={data}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.quoteContainer}>
               <Text style={styles.quoteText}>
-                {item.length > 25 ? item.substring(0, 25) + "..." : item}
+                {item.quote.length > 25
+                  ? item.quote.substring(0, 25) + "..."
+                  : item.quote}
               </Text>
               <Button
-                title="View Details"
+                title="Update"
                 onPress={() => navigation.navigate("Details", { quote: item })}
+              />
+              <Button
+                title="Delete"
+                color="red"
+                onPress={() => deleteQuote(item.id)}
               />
             </View>
           )}
@@ -112,9 +143,19 @@ const HomeScreen = ({ navigation }) => {
     </View>
   );
 };
-
 const DetailsScreen = ({ route, navigation }) => {
-  const [quote, setQuote] = useState(route.params?.quote);
+  const [quote, setQuote] = useState(route.params?.quote.quote);
+  const quoteId = route.params?.quote.id;
+
+  const saveUpdate = async () => {
+    try {
+      await updateDoc(doc(database, "quotes", quoteId), { quote });
+      Alert.alert("Quote saved!", "Your changes have been saved.");
+      navigation.navigate("Home");
+    } catch (error) {
+      console.error("Error updating document: ", error);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -124,13 +165,7 @@ const DetailsScreen = ({ route, navigation }) => {
         value={quote}
         onChangeText={(text) => setQuote(text)}
       />
-      <Button
-        title="Save"
-        onPress={() => {
-          Alert.alert("Quote saved!", "Your changes have been saved.");
-          navigation.navigate("Home", { updatedQuote: quote }); // Fix here
-        }}
-      />
+      <Button title="Save" onPress={saveUpdate} />
     </View>
   );
 };
